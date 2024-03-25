@@ -43,7 +43,7 @@ func main() {
 		}
 	}(pConn)
 
-	pqUsersRepo := postgres.NewPersonsStorage(pConn)
+	pqUsersRepo := postgres.NewUsersStorage(pConn)
 	pqRepo := postgres.NewRepository(pqUsersRepo)
 	repo := repository.NewRepository(pqRepo)
 

@@ -9,7 +9,7 @@ type Repository struct {
 	Users Users
 }
 
-func NewRepository(users Users) *Repository {
+func NewRepository(users *UsersStorage) *Repository {
 	return &Repository{
 		Users: users,
 	}

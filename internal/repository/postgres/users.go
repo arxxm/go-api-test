@@ -13,7 +13,7 @@ type UsersStorage struct {
 	conn *sql.DB
 }
 
-func NewPersonsStorage(conn *sql.DB) *UsersStorage {
+func NewUsersStorage(conn *sql.DB) *UsersStorage {
 	return &UsersStorage{conn: conn}
 }
 

@@ -34,7 +34,7 @@ func (r *UsersStorage) Delete(ctx context.Context, id int64) error {
 
 func (r *UsersStorage) GetByID(ctx context.Context, id int64) (domain.User, error) {
 	var user domain.User
-	err := r.conn.QueryRowContext(ctx, "SELECT id, name, last_name, surname, gender, status, date_of_birth, created_at FROM users WHERE id = $1", id).Scan(&user.ID, &user.LastName, &user.Surname, &user.Gender, &user.Status, &user.DateOfBirth, &user.CreatedAt)
+	err := r.conn.QueryRowContext(ctx, "SELECT id, name, last_name, surname, gender, status, date_of_birth, created_at FROM users WHERE id = $1", id).Scan(&user.ID, &user.Name, &user.LastName, &user.Surname, &user.Gender, &user.Status, &user.DateOfBirth, &user.CreatedAt)
 	return user, err
 }
 
@@ -121,7 +121,7 @@ func (r *UsersStorage) GetList(ctx context.Context, params *domain.UsersParam) (
 					users
 				`
 
-	aggregateQuery := fmt.Sprintf(" ORDER BY id DESC LIMIT $%d OFFSET $%d", paramCounter, paramCounter+1)
+	aggregateQuery := fmt.Sprintf(" ORDER BY %s %s LIMIT $%d OFFSET $%d", params.OrderBy, params.OrderDir, paramCounter, paramCounter+1)
 	queryParams = append(queryParams, params.Limit, params.Offset)
 
 	rows, err := r.conn.QueryContext(ctx, query+filters+aggregateQuery, queryParams...)
@@ -137,7 +137,7 @@ func (r *UsersStorage) GetList(ctx context.Context, params *domain.UsersParam) (
 
 	for rows.Next() {
 		var user domain.User
-		if err = rows.Scan(&user.ID, &user.LastName, &user.Surname, &user.Gender, &user.Status, &user.DateOfBirth, &user.CreatedAt); err != nil {
+		if err = rows.Scan(&user.ID, &user.Name, &user.LastName, &user.Surname, &user.Gender, &user.Status, &user.DateOfBirth, &user.CreatedAt); err != nil {
 			return nil, 0, err
 		}
 		users = append(users, user)
@@ -155,21 +155,9 @@ func getUsersParams(params *domain.UsersParam) (string, []interface{}, int) {
 	var queryParams []interface{}
 	paramCounter := 1
 
-	if params.Name != "" {
-		queryFilters = append(queryFilters, fmt.Sprintf("name LIKE $%d", paramCounter))
-		queryParams = append(queryParams, "%"+params.Name+"%")
-		paramCounter++
-	}
-
-	if params.LastName != "" {
-		queryFilters = append(queryFilters, fmt.Sprintf("last_name LIKE $%d", paramCounter))
-		queryParams = append(queryParams, "%"+params.LastName+"%")
-		paramCounter++
-	}
-
-	if params.Surname != "" {
-		queryFilters = append(queryFilters, fmt.Sprintf("surname LIKE $%d", paramCounter))
-		queryParams = append(queryParams, "%"+params.Surname+"%")
+	if params.FullName != "" {
+		queryFilters = append(queryFilters, fmt.Sprintf("CONCAT(name, ' ', last_name, ' ', COALESCE(surname, '')) LIKE $%d", paramCounter))
+		queryParams = append(queryParams, "%"+params.FullName+"%")
 		paramCounter++
 	}
 

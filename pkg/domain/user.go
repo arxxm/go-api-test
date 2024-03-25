@@ -14,12 +14,11 @@ type User struct {
 }
 
 type UsersParam struct {
-	ID       int
-	Name     string
-	LastName string
-	Surname  string
 	Gender   string
 	Status   string
+	OrderBy  string
+	OrderDir string
+	FullName string
 	Limit    int64
 	Offset   int64
 }

@@ -56,6 +56,7 @@ func (s *UsersService) GetByID(ctx context.Context, id int64) (domain.User, erro
 func (s *UsersService) GetList(ctx context.Context, params *domain.UsersParam) ([]domain.User, uint64, error) {
 	persons, total, err := s.repo.Postgres.Users.GetList(ctx, params)
 	if err != nil {
+		log.Printf("[ERROR] User get list err: %v\n", err)
 		return nil, 0, err
 	}
 	return persons, total, err

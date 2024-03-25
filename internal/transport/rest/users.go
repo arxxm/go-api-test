@@ -2,6 +2,7 @@ package rest
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/gorilla/mux"
 	"go-api-test/pkg/domain"
 	"net/http"
@@ -17,8 +18,8 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if msg := checkUserFields(req); msg != "" {
-		responseError(w, http.StatusBadRequest, msg)
+	if err := checkUserFields(req); err != nil {
+		responseError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -41,8 +42,8 @@ func (h *Handler) updateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if msg := checkUserFields(req); msg != "" {
-		responseError(w, http.StatusBadRequest, msg)
+	if err := checkUserFields(req); err != nil {
+		responseError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -64,30 +65,34 @@ func (h *Handler) updateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response200(w, nil)
+	response200(w, "ok")
 }
 
 func (h *Handler) deleteUser(w http.ResponseWriter, r *http.Request) {
 
-	params := mux.Vars(r)
-	idStr := params["id"]
+	type request struct {
+		ID int64 `json:"id"`
+	}
 
-	if idStr == "" {
+	var req request
+	var err error
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		responseError(w, http.StatusBadRequest, "")
+		return
+	}
+
+	if req.ID == 0 {
 		responseError(w, http.StatusBadRequest, "id is empty")
 		return
 	}
 
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		responseError(w, http.StatusBadRequest, "invalid id parameter "+err.Error())
-	}
-
-	if err = h.service.Users.Delete(r.Context(), int64(id)); err != nil {
+	if err = h.service.Users.Delete(r.Context(), req.ID); err != nil {
 		responseError(w, http.StatusInternalServerError, "an error occurred while deleting the user")
 		return
 	}
 
-	response200(w, nil)
+	response200(w, "ok")
 }
 
 func (h *Handler) getUserByID(w http.ResponseWriter, r *http.Request) {
@@ -121,25 +126,9 @@ func (h *Handler) getUsersList(w http.ResponseWriter, r *http.Request) {
 		Offset: 0,
 	}
 
-	limit := int64(0)
-	limitStr := r.FormValue("limit")
-	offset := int64(50)
-	offsetStr := r.FormValue("offset")
-	if len(limitStr) != 0 {
-		limit, err = strconv.ParseInt(limitStr, 10, 64)
-		if err != nil {
-			responseError(w, http.StatusBadRequest, "invalid limit parameter")
-			return
-		}
-		params.Limit = limit
-	}
-	if len(offsetStr) != 0 {
-		offset, err = strconv.ParseInt(offsetStr, 10, 64)
-		if err != nil {
-			responseError(w, http.StatusBadRequest, "invalid offset parameter")
-			return
-		}
-		params.Offset = offset
+	if err = getUsersFilters(r, params); err != nil {
+		responseError(w, http.StatusBadRequest, err.Error())
+		return
 	}
 
 	users, total, err := h.service.Users.GetList(r.Context(), params)
@@ -161,18 +150,70 @@ func (h *Handler) getUsersList(w http.ResponseWriter, r *http.Request) {
 	response200(w, res)
 }
 
-func checkUserFields(user domain.User) string {
+func getUsersFilters(r *http.Request, params *domain.UsersParam) error {
+	var err error
+
+	limit := int64(0)
+	limitStr := r.FormValue("limit")
+	offset := int64(50)
+	offsetStr := r.FormValue("offset")
+	if len(limitStr) != 0 {
+		limit, err = strconv.ParseInt(limitStr, 10, 64)
+		if err != nil {
+			return errors.New(`invalid "limit" parameter`)
+		}
+		params.Limit = limit
+	}
+	if len(offsetStr) != 0 {
+		offset, err = strconv.ParseInt(offsetStr, 10, 64)
+		if err != nil {
+			return errors.New(`invalid "offset"" parameter`)
+
+		}
+		params.Offset = offset
+	}
+
+	gender := r.FormValue("gender")
+	if gender != "" {
+		params.Gender = gender
+	}
+
+	status := r.FormValue("status")
+	if status != "" {
+		params.Status = status
+	}
+
+	fullName := r.FormValue("full_name")
+	if fullName != "" {
+		params.FullName = fullName
+	}
+
+	orderBy := r.FormValue("order_by")
+	if orderBy == "" {
+		orderBy = "id"
+	}
+	params.OrderBy = orderBy
+	orderDir := r.FormValue("order_dir")
+	if orderDir == "" {
+		orderDir = "DESC"
+	}
+	params.OrderDir = orderDir
+
+	return nil
+}
+
+func checkUserFields(user domain.User) error {
 	if user.Name == "" {
-		return `field "Name" is required`
+		return errors.New(`field "Name" is required`)
 	}
 	if user.LastName == "" {
-		return `field "LastName" is required`
+		return errors.New(`field "Last name" is required`)
 	}
 	if user.Gender == "" {
-		return `field "Gender" is required`
+		return errors.New(`field "Gender" is required`)
 	}
 	if user.Status == "" {
-		return `field "Status" is required`
+		return errors.New(`field "Status" is required`)
 	}
-	return ""
+	return nil
 }

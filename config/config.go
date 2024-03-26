@@ -13,6 +13,8 @@ type Config struct {
 	PostgresName string
 	PostgresUser string
 	PostgresPass string
+	RedisHost    string
+	RedisPort    int
 }
 
 func New() (*Config, error) {

@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
-	"database/sql"
+	rc "github.com/go-redis/redis/v8"
+	"github.com/jackc/pgx/v5"
 	_ "github.com/lib/pq"
 	"go-api-test/config"
 	"go-api-test/internal/repository"
 	"go-api-test/internal/repository/postgres"
+	"go-api-test/internal/repository/redis"
 	"go-api-test/internal/server"
 	"go-api-test/internal/service"
 	"go-api-test/internal/transport/rest"
@@ -27,8 +29,8 @@ func main() {
 	}
 
 	var (
-		_, cancel = context.WithCancel(context.Background())
-		quit      = make(chan os.Signal, 1)
+		ctx, cancel = context.WithCancel(context.Background())
+		quit        = make(chan os.Signal, 1)
 	)
 
 	p := database.NewPostgres(cfg)
@@ -37,15 +39,28 @@ func main() {
 		log.Fatal(err)
 	}
 
-	defer func(pConn *sql.DB) {
-		if err = pConn.Close(); err != nil {
+	defer func(pConn *pgx.Conn) {
+		if err = pConn.Close(ctx); err != nil {
 			log.Fatal(err)
 		}
 	}(pConn)
 
+	r := database.NewRedis(cfg)
+	rConn, err := r.Init()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func(pConn *rc.Client) {
+		if err = pConn.Close(); err != nil {
+			log.Fatal(err)
+		}
+	}(rConn)
+
 	pqUsersRepo := postgres.NewUsersStorage(pConn)
+	redisUsersRepo := redis.NewUsersStorage(rConn)
 	pqRepo := postgres.NewRepository(pqUsersRepo)
-	repo := repository.NewRepository(pqRepo)
+	redisRepo := redis.NewRepository(redisUsersRepo)
+	repo := repository.NewRepository(pqRepo, redisRepo)
 
 	usersService := service.NewUsersService(repo)
 	s := service.NewService(usersService)

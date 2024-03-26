@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/gorilla/mux"
 	"go-api-test/pkg/domain"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -14,12 +15,19 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 	var req domain.User
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		responseError(w, http.StatusBadRequest, "")
+		responseError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	if err := checkUserFields(req); err != nil {
 		responseError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	dd := req.DateOfBirth.Format(time.RFC3339)
+	log.Println(dd)
+	if _, err := time.Parse(time.RFC3339, req.DateOfBirth.Format(time.RFC3339)); err != nil {
+		responseError(w, http.StatusBadRequest, "incorrect date format")
 		return
 	}
 
@@ -78,7 +86,7 @@ func (h *Handler) deleteUser(w http.ResponseWriter, r *http.Request) {
 	var err error
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		responseError(w, http.StatusBadRequest, "")
+		responseError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -92,7 +100,7 @@ func (h *Handler) deleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response200(w, "ok")
+	response200(w, "deleted")
 }
 
 func (h *Handler) getUserByID(w http.ResponseWriter, r *http.Request) {
@@ -138,7 +146,7 @@ func (h *Handler) getUsersList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type response struct {
-		Users []domain.User `json:"persons"`
+		Users []domain.User `json:"users"`
 		Total uint64        `json:"total"`
 	}
 

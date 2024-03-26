@@ -2,39 +2,42 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+	"github.com/jackc/pgx/v5"
 	"go-api-test/pkg/domain"
-	"log"
 	"strings"
 )
 
 type UsersStorage struct {
-	conn *sql.DB
+	conn *pgx.Conn
 }
 
-func NewUsersStorage(conn *sql.DB) *UsersStorage {
+func NewUsersStorage(conn *pgx.Conn) *UsersStorage {
 	return &UsersStorage{conn: conn}
 }
 
 func (r *UsersStorage) Create(ctx context.Context, user domain.User) (int64, error) {
 	var id int64
-	stmt, err := r.conn.PrepareContext(ctx, "INSERT INTO users(name, last_name, surname, gender, status, date_of_birth, created_at) VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING id")
+	err := r.conn.QueryRow(ctx, `
+		INSERT INTO users(name, last_name, surname, gender, status, date_of_birth, created_at)
+		VALUES($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id
+	`, user.Name, user.LastName, user.Surname, user.Gender, user.Status, user.DateOfBirth, user.CreatedAt).Scan(&id)
 	if err != nil {
 		return 0, err
 	}
-	err = stmt.QueryRow(user.Name, user.LastName, user.Surname, user.Gender, user.Status, user.DateOfBirth, user.CreatedAt).Scan(&id)
-	return id, err
+	return id, nil
 }
 
 func (r *UsersStorage) Delete(ctx context.Context, id int64) error {
-	_, err := r.conn.ExecContext(ctx, "DELETE FROM users WHERE id = $1", id)
+	_, err := r.conn.Exec(ctx, "DELETE FROM users WHERE id = $1", id)
 	return err
 }
 
 func (r *UsersStorage) GetByID(ctx context.Context, id int64) (domain.User, error) {
 	var user domain.User
-	err := r.conn.QueryRowContext(ctx, "SELECT id, name, last_name, surname, gender, status, date_of_birth, created_at FROM users WHERE id = $1", id).Scan(&user.ID, &user.Name, &user.LastName, &user.Surname, &user.Gender, &user.Status, &user.DateOfBirth, &user.CreatedAt)
+	err := r.conn.QueryRow(ctx, "SELECT id, name, last_name, surname, gender, status, date_of_birth, created_at FROM users WHERE id = $1", id).
+		Scan(&user.ID, &user.Name, &user.LastName, &user.Surname, &user.Gender, &user.Status, &user.DateOfBirth, &user.CreatedAt)
 	return user, err
 }
 
@@ -83,7 +86,7 @@ func (r *UsersStorage) Update(ctx context.Context, id int64, user domain.User) e
 	updateQuery := fmt.Sprintf("UPDATE users SET %s WHERE id = $%d", strings.Join(updateQueryParts, ", "), paramCounter)
 	queryParams = append(queryParams, id)
 
-	if _, err := r.conn.ExecContext(ctx, updateQuery, queryParams...); err != nil {
+	if _, err := r.conn.Exec(ctx, updateQuery, queryParams...); err != nil {
 		return err
 	}
 
@@ -100,7 +103,7 @@ func (r *UsersStorage) GetList(ctx context.Context, params *domain.UsersParam) (
 		filters = " WHERE " + filters
 	}
 
-	if err := r.conn.QueryRowContext(ctx,
+	if err := r.conn.QueryRow(ctx,
 		"SELECT COUNT(*) FROM users"+filters, queryParams...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
@@ -124,16 +127,12 @@ func (r *UsersStorage) GetList(ctx context.Context, params *domain.UsersParam) (
 	aggregateQuery := fmt.Sprintf(" ORDER BY %s %s LIMIT $%d OFFSET $%d", params.OrderBy, params.OrderDir, paramCounter, paramCounter+1)
 	queryParams = append(queryParams, params.Limit, params.Offset)
 
-	rows, err := r.conn.QueryContext(ctx, query+filters+aggregateQuery, queryParams...)
+	rows, err := r.conn.Query(ctx, query+filters+aggregateQuery, queryParams...)
 	if err != nil {
 		return users, total, err
 	}
 
-	defer func(rows *sql.Rows) {
-		if err = rows.Close(); err != nil {
-			log.Println("GetList error occurred while closing connection err:", err)
-		}
-	}(rows)
+	defer rows.Close()
 
 	for rows.Next() {
 		var user domain.User

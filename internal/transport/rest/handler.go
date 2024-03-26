@@ -31,24 +31,10 @@ func (h *Handler) InitRoutes() *mux.Router {
 			users.HandleFunc("/", h.getUsersList).Methods("GET")
 			users.HandleFunc("/", h.createUser).Methods("POST")
 			users.HandleFunc("/", h.updateUser).Methods("PUT")
-			users.HandleFunc("/{id}", h.deleteUser).Methods("DELETE")
+			users.HandleFunc("/", h.deleteUser).Methods("DELETE")
 			users.HandleFunc("/{id}", h.getUserByID).Methods("GET")
-
 		}
 	}
-	//{
-	//	api.GET("/health", func(context *gin.Context) {
-	//		response200(context, nil)
-	//	})
-	//
-	//	persons := api.Group("/persons")
-	//	{
-	//		//persons.GET("/", h.getPersonsList)
-	//		//persons.PATCH("/:id", h.updatePerson)
-	//		//persons.POST("/", h.createPerson)
-	//		//persons.DELETE("/:id", h.deletePerson)
-	//	}
-	//}
 
 	return router
 }

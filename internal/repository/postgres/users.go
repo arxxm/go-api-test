@@ -55,7 +55,7 @@ func (r *UsersStorage) Update(ctx context.Context, id int64, user domain.User) e
 
 	if user.LastName != "" {
 		updateQueryParts = append(updateQueryParts, fmt.Sprintf("last_name = $%d", paramCounter))
-		queryParams = append(queryParams, user.Surname)
+		queryParams = append(queryParams, user.LastName)
 		paramCounter++
 	}
 
